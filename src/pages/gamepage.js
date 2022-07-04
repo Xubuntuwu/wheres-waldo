@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import waldomap from '../assets/waldolocation.jpg';
 import './gamepage.css';
-import {doc,onSnapshot} from 'firebase/firestore';
+import {doc,onSnapshot, getDoc, updateDoc} from 'firebase/firestore';
 
 function Gamepage(props){
     const [lastchar, setlastchar] = useState(null);
@@ -10,8 +10,10 @@ function Gamepage(props){
     const [wizard, setwizard] = useState(false);
     const [woman, setwoman] = useState(false);
     const [time, settime] = useState(0);
+    const [finaltime, setfinaltime] = useState(0);
     const [intervalval, setintervalval] = useState(null);
     const [allcoords, setallcoords] = useState(null);
+    const [stateleaderboard, setstateleaderboard] = useState([]);
 
     
     
@@ -19,7 +21,8 @@ function Gamepage(props){
         const docRef = doc(props.db, 'winterwaldo','22TT01FdxInFMhY3NyiT');
         onSnapshot(docRef, (doc)=>{
             setallcoords(doc.data());
-    });
+        }
+    );
     }
     useEffect(()=>{
         settime(0);
@@ -31,6 +34,7 @@ function Gamepage(props){
         setbeeman(false);
         setwizard(false);
         setwoman(false);
+        setfinaltime(0);
         initFireBase();
         const interval = setInterval(() => {
             settime((prev)=>prev+1);
@@ -47,16 +51,90 @@ function Gamepage(props){
     }, [waldo, beeman, wizard, woman]);
 
     const gamecheck = () =>{
-        if(waldo && beeman && wizard && woman){
+        if(waldo && beeman && wizard && woman && finaltime===0){
             const finishedmodal = document.getElementById('finished');
             const text = finishedmodal.querySelector('#text');
-            text.replaceChildren(`GAME WON, YOU FOUND THEM ALL IN ${time} SECONDS!`);
+            const final = time;
+            setfinaltime(final);
+            text.replaceChildren(`GAME WON, YOU FOUND THEM ALL IN ${final} SECONDS!`);
             finishedmodal.style.display='flex';
             clearInterval(intervalval);
             setintervalval(null);
         }
     }
 
+    const checkifleaderboard = () =>{
+        const div = document.querySelector('#leaderboard-submit');
+        const leaderboarddiv = document.getElementById('leaderboard');
+        const docRef = doc(props.db, 'winterwaldo','22TT01FdxInFMhY3NyiT');
+        getDoc(docRef)
+        .then((doc)=>{
+            let leaderboard = doc.data().leaderboard;
+            if(leaderboard.findIndex((e)=>e.name===null)!==-1){
+                div.style.display = 'flex';
+            }
+            else if(leaderboard.findIndex((e)=>e.time>finaltime)!==-1){
+                div.style.display = 'flex';
+            }
+            else{
+                leaderboarddiv.style.display='flex';
+            }
+            leaderboard = leaderboard.sort((a,b)=>{
+                if(a.time===null){
+                    return 1;
+                }
+                return a.time -b.time;
+            })
+            setstateleaderboard(leaderboard);
+        })
+        .catch(e=>console.log(e));
+    }
+
+    const leaderboardsubmit = (e) =>{
+        e.preventDefault();
+        const div = document.getElementById('leaderboard-submit');
+        const leaderboarddiv = document.getElementById('leaderboard');
+        const docRef = doc(props.db, 'winterwaldo','22TT01FdxInFMhY3NyiT');
+        getDoc(docRef)
+        .then((doc)=>{
+            let leaderboard = doc.data().leaderboard;
+            if(leaderboard.findIndex((e)=>e.name===null)!==-1){
+               let index = leaderboard.findIndex((e)=>e.name===null);
+               leaderboard[index].name = div.querySelector('input').value;
+               leaderboard[index].time = finaltime;
+               updateDoc(docRef,{
+                leaderboard: leaderboard
+               }).then(()=>
+                {div.style.display='none' ;
+               leaderboarddiv.style.display='flex'});
+            }
+            else if(leaderboard.findIndex((e)=>e.time>finaltime)!==-1){
+            let index = leaderboard.findIndex((e)=>e.time>finaltime);
+               leaderboard[index].name = div.querySelector('input').value;
+               leaderboard[index].time = finaltime;
+               updateDoc(docRef,{
+                leaderboard: leaderboard
+               }).then(()=>
+               {div.style.display='none' ;
+              leaderboarddiv.style.display='flex'});
+            }
+            else{
+                console.log('illegal access to leadeboard');
+            }
+            leaderboard = leaderboard.sort((a,b)=>{
+                if(a.time===null){
+                    return 1;
+                }
+                else if(b.time===null){
+                    return -1;
+                }
+                return a.time -b.time;
+            })
+            setstateleaderboard(leaderboard);
+        })
+        .catch(e=> console.log(e))
+
+    }
 
     const characterclick = (e) =>{
         const modal = document.getElementById('characterchoice');
@@ -142,9 +220,22 @@ function Gamepage(props){
         modal.style.position= 'absolute';
         modal.style.display = modal.style.display!=='flex' ? 'flex' : 'none';
     }
-    const removeModal = () =>{
+    const removeModal = (e) =>{
+        e.preventDefault();
         const finishedmodal = document.getElementById('finished');
         finishedmodal.style.display='none';
+        checkifleaderboard();
+    }
+    const removeleaderboardsumbit = (e) =>{
+        e.preventDefault();
+        const div = document.getElementById('leaderboard-submit');
+        div.style.display='none';
+    }
+
+    const removeleaderboard = (e) =>{
+        e.preventDefault();
+        const div = document.getElementById('leaderboard');
+        div.style.display='none';
     }
 
     const feedback = (result) =>{
@@ -197,9 +288,27 @@ function Gamepage(props){
                 <div id="feedback">
                 </div>
                 <div id="timer">
-                    {time}
+                    {finaltime!== 0 ? finaltime : time}
                 </div>
-            </div>:
+                <div id="leaderboard-submit">
+                    <h3>You made it to the leaderboard!</h3>
+                    <form>
+                        <label htmlFor="name">Name: </label>
+                        <input type="text" name="name"/>
+                        <button onClick={leaderboardsubmit}>Submit</button>
+                        <button onClick={removeleaderboardsumbit}>Cancel</button>
+                    </form>
+                </div>
+                <div id="leaderboard">
+                    <h3>Top 10 Players</h3>
+                    <ul>
+                    {stateleaderboard.length===10 ? stateleaderboard.map((person, index)=>{
+                        return person.name ? <li key={index}>Player {index+1}: {person.name}, Time: {person.time}</li> : <li key={index}>Nobody yet</li>
+                    }) : ''}
+                    </ul>
+                    <button onClick={removeleaderboard}>Cool</button>
+                </div>
+            </div> :
             <div>Page Loading</div>}
         </div>
     );

@@ -2,7 +2,7 @@ import React from "react";
 import waldopic from '../assets/waldo.jpg';
 import wendapic from '../assets/waldowoman.jpg';
 import wizardpic from '../assets/wizardwhitebeard.jpeg';
-import beemanpic from '../assets/beeman.jpeg';
+import beemanpic from '../assets/beeman.jpg';
 import './startpage.css';
 import { Link } from "react-router-dom";
 
